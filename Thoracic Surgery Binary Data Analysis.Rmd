@@ -1,0 +1,113 @@
+---
+title: "Thoracic Surgery Binary Dataset"
+author: "Kaylar Fullington"
+date: 02/19/2022
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(foreign)
+thoracic_df <- read.arff("https://archive.ics.uci.edu/ml/machine-learning-databases/00277/ThoraricSurgery.arff")
+
+head(thoracic_df)
+
+###Renaming the columns
+colnames(thoracic_df) <- c("DGN", "FVC(numeric)", "FEV1(numeric)", "PerStat_Zubrod(cat)", "Pain_Before(T/F)", "Hae_Before(T/F)", "Dys_Before(T/F)", "Cough_Before(T/F)", "Weak_Before(T/F)", "Size_of_Tumor(cat)", "Type2_Diab(T/F)", "MI_6mos(T/F)", "PAD(T/F)", "Smoking(T/F)", "Asthma(T/F)", "Age_at_Surgery(numeric)", "Risk1Yr(T/F)")
+
+###Verifying factor vs numeric
+str(thoracic_df)
+
+### Everything that should be a factor is a factor, same for numeric
+```
+
+```{r}
+
+## Here we analyze what items we may need to remove in order to find the line of best fit
+
+xtabs(~ thoracic_df$DGN)
+### Possibly need to remove DGN1 (only one patient), DGN6 (only four patients), and DGN8 (only 2 patients)
+
+xtabs(~ thoracic_df$`PerStat_Zubrod(cat)`)
+### True is small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`Pain_Before(T/F)`)
+### True is small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`Hae_Before(T/F)`)
+### True is small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`Dys_Before(T/F)`)
+### True is small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`Cough_Before(T/F)`)
+### Much closer split compared to other binaries so far
+
+xtabs(~ thoracic_df$`Weak_Before(T/F)`)
+### True is small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`Size_of_Tumor(cat)`)
+### May need to remove OC13 and OC14 due to small patient pool, could impact results
+
+xtabs(~ thoracic_df$`Type2_Diab(T/F)`)
+### True is small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`MI_6mos(T/F)`)
+### True is extraordinarily small, probably should remove?
+
+xtabs(~ thoracic_df$`PAD(T/F)`)
+### True is very small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`Smoking(T/F)`)
+### False is small, but probably won't remove due to impact on analysis
+
+xtabs(~ thoracic_df$`Asthma(T/F)`)
+### True is extraordinarily small, probably should remove?
+
+xtabs(~ thoracic_df$`Risk1Yr(T/F)`)
+### True is small, but probably won't remove due to impact on analysis
+
+```
+
+
+```{r}
+library(caTools)
+split <- sample.split(thoracic_df, SplitRatio = 0.8)
+train <- subset(thoracic_df, split == "TRUE")
+test <- subset(thoracic_df, split == "FALSE")
+
+
+log_line_thoracic <- glm(train$`Risk1Yr(T/F)` ~ ., data = train, family = "binomial")
+
+summary(log_line_thoracic)
+
+```
+### According to this summary, some of the variables that had the greatest effect on the survival rate include:
+
+* Smoking with a p-value of 0.02984
+* Type 2 Diabetes with a p-value of 0.03709
+* Size of Tumor
+  + OC14 with a p-value of 0.00668
+  + OC13 with a p-value of 0.05580
+* Whether the patient had Dyspnoea before surgery, p-value of 0.00494
+
+
+```{r}
+res <- predict(log_line_thoracic, test, type = "response")
+
+res <- predict(log_line_thoracic, train, type = "response")
+
+confmatrix <- table(Actual_Value = train$`Risk1Yr(T/F)`, Predicted_Value = res > 0.5)
+confmatrix
+
+(confmatrix[[1,1]] + confmatrix[[2,2]]) / sum(confmatrix)
+
+```
+
+### The accuracy of this model is at about 86%
+
+
+
